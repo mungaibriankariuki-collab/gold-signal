@@ -66,5 +66,5 @@ fun JSONObject.doubleOrNull(key: String): Double? =
 fun JSONObject.stringOrNull(key: String): String? =
     if (isNull(key)) null else optString(key).ifEmpty { null }
 
-fun <T> JSONArray?.toList(get: JSONArray.(Int) -> T): List<T> =
-    if (this == null) emptyList() else (0 until length()).map { get(it) }
+fun <T> JSONArray?.toList(read: JSONArray.(Int) -> T): List<T> =
+    if (this == null) emptyList() else (0 until length()).map { read(it) }
