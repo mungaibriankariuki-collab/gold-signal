@@ -15,7 +15,7 @@ class GeminiException(message: String) : IOException(message)
 object Gemini {
     private const val BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 
-    fun analyze(apiKey: String, model: String, jpeg: ByteArray, slPips: Int, tpPips: Int): Signal {
+    fun analyze(apiKey: String, model: String, jpeg: ByteArray, slPips: Int, tpPips: List<Int>): Signal {
         val body = JSONObject()
             .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray()
                 .put(JSONObject().put("text", prompt(slPips, tpPips)))
@@ -50,28 +50,28 @@ object Gemini {
         return toSignal(r, slPips, tpPips)
     }
 
-    private fun toSignal(r: JSONObject, slPips: Int, tpPips: Int): Signal {
+    private fun toSignal(r: JSONObject, slPips: Int, tpPips: List<Int>): Signal {
         val signal = when (r.optString("signal").uppercase(Locale.US).replace('_', ' ').trim()) {
             Signal.BUY -> Signal.BUY
             Signal.SELL -> Signal.SELL
             else -> Signal.NO_TRADE
         }
         val entry = r.doubleOrNull("entry")?.takeIf { it > 0 }
-        // Stop and target are set from the pip settings so they are always exactly the chosen distance.
-        val sl = Gold.pipsToPrice(slPips)
-        val tp = Gold.pipsToPrice(tpPips)
-        val (stop, target) = when {
-            entry == null -> null to null
-            signal == Signal.BUY -> entry - sl to entry + tp
-            signal == Signal.SELL -> entry + sl to entry - tp
-            else -> null to null
+        // Stop and targets are set from the pip settings so they are always exactly the chosen distance.
+        val dir = when {
+            entry == null -> 0
+            signal == Signal.BUY -> 1
+            signal == Signal.SELL -> -1
+            else -> 0
         }
+        val stop = if (dir == 0) null else entry!! - dir * Gold.pipsToPrice(slPips)
+        val targets = if (dir == 0) emptyList() else tpPips.map { entry!! + dir * Gold.pipsToPrice(it) }
         return Signal(
             time = System.currentTimeMillis(),
             signal = signal,
             entry = entry,
             stopLoss = stop,
-            takeProfit = target,
+            takeProfits = targets,
             slPips = slPips,
             tpPips = tpPips,
             trend = r.optString("trend").ifBlank { "Unclear" },
@@ -81,28 +81,30 @@ object Gemini {
         )
     }
 
-    private fun prompt(slPips: Int, tpPips: Int): String {
+    private fun prompt(slPips: Int, tpPips: List<Int>): String {
         val sl = Gold.price(Gold.pipsToPrice(slPips))
-        val tp = Gold.price(Gold.pipsToPrice(tpPips))
+        val tps = tpPips.map { Gold.price(Gold.pipsToPrice(it)) }
+        val tp = tps.first()
+        val tpList = tpPips.indices.joinToString(", ") { "TP${it + 1} = ${tpPips[it]} pips (${tps[it]})" }
         return """
             You are a careful trading analyst. The image is a MetaTrader 5 screenshot that should show a gold (XAUUSD) price chart.
 
             Read the chart: the timeframe, the current price (the price label or line on the right-hand axis), the trend and market structure (higher highs and higher lows, or lower highs and lower lows), nearby support and resistance, and the last few candles.
 
             Units: 1 pip = 0.10 of price (a move from 2400.00 to 2400.10 is 1 pip).
-            The trader uses a fixed stop loss of $slPips pips ($sl in price) and a fixed take profit of $tpPips pips ($tp in price).
-            For a BUY: stop = entry - $sl, target = entry + $tp. For a SELL: stop = entry + $sl, target = entry - $tp.
+            The trader uses a fixed stop loss of $slPips pips ($sl in price) and three take profits: $tpList.
+            For a BUY: stop = entry - $sl, each target = entry + its distance. For a SELL: stop = entry + $sl, each target = entry - its distance.
 
             Decide BUY, SELL or NO TRADE. Choose NO TRADE when:
             - the trend is unclear or price is in the middle of a range,
-            - a support or resistance level sits between the entry and a target $tp away,
+            - a support or resistance level sits between the entry and TP1 ($tp away),
             - a stop $sl away would sit inside recent normal price swings,
             - or the image is not a readable gold chart (say so in the reason).
 
             entry: the price to enter at, normally the current price. Read it from the price axis and do not invent precision. Use null if no price can be read.
             trend: Uptrend, Downtrend or Sideways.
             timeframe: as shown on the chart, e.g. M5, M15, H1, H4, D1; "?" if not visible.
-            reason: 2 to 4 short sentences about what is visible on the chart that supports the decision.
+            reason: 2 to 4 short sentences about what is visible on the chart that supports the decision, including which take profits look reachable.
             confidence: High only when trend, level and recent candles all agree; Medium when most agree; Low otherwise.
         """.trimIndent()
     }

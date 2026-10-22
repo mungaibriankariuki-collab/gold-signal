@@ -16,12 +16,16 @@
 
     <string name="calc_title">Lot size calculator</string>
     <string name="lot_hint">Lot size</string>
-    <string name="calc_result">%1$s per pip\nRisk: %2$s (SL %3$d pips)\nReward: %4$s (TP %5$d pips)\nRisk : reward = %6$s</string>
+    <string name="calc_per_pip">%1$s per pip</string>
+    <string name="calc_risk">Risk at SL: %1$s (%2$d pips)</string>
+    <string name="calc_reward">Reward at TP%1$d: %2$s (%3$d pips, %4$s)</string>
     <string name="calc_invalid">Enter a lot size, e.g. 0.05</string>
 
     <string name="label_entry">Entry</string>
     <string name="label_sl">Stop loss</string>
-    <string name="label_tp">Take profit</string>
+    <string name="label_tp1">TP1</string>
+    <string name="label_tp2">TP2</string>
+    <string name="label_tp3">TP3</string>
     <string name="label_trend">Trend</string>
     <string name="confidence">Confidence: %1$s</string>
     <string name="level_pips">%1$s  (%2$d pips · %3$s)</string>
@@ -47,11 +51,13 @@
     <string name="key_removed">Key removed</string>
     <string name="model_hint">Gemini model</string>
     <string name="model_help">Default: gemini-flash-latest</string>
-    <string name="sltp_title">Stop loss and take profit</string>
+    <string name="sltp_title">Stop loss and take profits</string>
     <string name="sl_hint">Stop loss (pips)</string>
-    <string name="tp_hint">Take profit (pips)</string>
+    <string name="tp1_hint">TP1 (pips)</string>
+    <string name="tp2_hint">TP2 (pips)</string>
+    <string name="tp3_hint">TP3 (pips)</string>
     <string name="pips_help">%1$d pips = %2$s price move (1 pip = $0.10)</string>
     <string name="save">Save</string>
     <string name="saved">Saved</string>
-    <string name="err_pips">Enter whole numbers from 1 to 10000 for stop loss and take profit</string>
+    <string name="err_pips">Enter whole numbers from 1 to 10000 for the stop loss and take profits</string>
 </resources>

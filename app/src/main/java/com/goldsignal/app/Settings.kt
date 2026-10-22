@@ -30,9 +30,14 @@ class Settings(ctx: Context) {
         get() = prefs.getInt("sl_pips", DEFAULT_SL)
         set(v) = prefs.edit().putInt("sl_pips", v).apply()
 
-    var tpPips: Int
-        get() = prefs.getInt("tp_pips", DEFAULT_TP)
-        set(v) = prefs.edit().putInt("tp_pips", v).apply()
+    /** TP1, TP2 and TP3 in pips. */
+    var tpPips: List<Int>
+        get() = DEFAULT_TPS.mapIndexed { i, d -> prefs.getInt("tp${i + 1}_pips", d) }
+        set(v) {
+            val edit = prefs.edit()
+            v.forEachIndexed { i, p -> edit.putInt("tp${i + 1}_pips", p) }
+            edit.apply()
+        }
 
     var lot: String
         get() = prefs.getString("lot", "0.05")!!
@@ -55,7 +60,7 @@ class Settings(ctx: Context) {
 
     companion object {
         const val DEFAULT_SL = 120
-        const val DEFAULT_TP = 300
+        val DEFAULT_TPS = listOf(240, 370, 500)
         const val DEFAULT_MODEL = "gemini-flash-latest"
     }
 }

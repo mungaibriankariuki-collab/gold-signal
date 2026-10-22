@@ -36,12 +36,14 @@ class SettingsActivity : AppCompatActivity() {
 
         b.modelInput.setText(settings.model)
         b.slInput.setText(settings.slPips.toString())
-        b.tpInput.setText(settings.tpPips.toString())
+        tpInputs().zip(settings.tpPips).forEach { (input, pips) -> input.setText(pips.toString()) }
         explainPips(b.slInput, b.slHelp)
-        explainPips(b.tpInput, b.tpHelp)
+        tpInputs().zip(listOf(b.tp1Help, b.tp2Help, b.tp3Help)).forEach { (input, help) -> explainPips(input, help) }
 
         b.save.setOnClickListener { save() }
     }
+
+    private fun tpInputs() = listOf(b.tp1Input, b.tp2Input, b.tp3Input)
 
     private fun showKeyState() {
         val has = settings.hasApiKey
@@ -60,13 +62,13 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun save() {
         val sl = b.slInput.text.toString().toIntOrNull()
-        val tp = b.tpInput.text.toString().toIntOrNull()
-        if (sl == null || tp == null || sl !in 1..10_000 || tp !in 1..10_000) {
+        val tps = tpInputs().map { it.text.toString().toIntOrNull() }
+        if (sl == null || sl !in 1..10_000 || tps.any { it == null || it !in 1..10_000 }) {
             Toast.makeText(this, R.string.err_pips, Toast.LENGTH_LONG).show()
             return
         }
         settings.slPips = sl
-        settings.tpPips = tp
+        settings.tpPips = tps.map { it!! }
         settings.model = b.modelInput.text.toString()
         val key = b.keyInput.text.toString().trim()
         if (key.isNotEmpty()) settings.apiKey = key

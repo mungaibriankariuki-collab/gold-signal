@@ -34,9 +34,13 @@ fun ViewSignalBinding.show(s: Signal) {
     stopLoss.text = s.stopLoss?.let {
         ctx.getString(R.string.level_pips, Gold.price(it), s.slPips, Gold.money(Gold.pipsToPrice(s.slPips)))
     } ?: none
-    takeProfit.text = s.takeProfit?.let {
-        ctx.getString(R.string.level_pips, Gold.price(it), s.tpPips, Gold.money(Gold.pipsToPrice(s.tpPips)))
-    } ?: none
+    listOf(tp1, tp2, tp3).forEachIndexed { i, view ->
+        val price = s.takeProfits.getOrNull(i)
+        val pips = s.tpPips.getOrNull(i)
+        view.text = if (price == null || pips == null) none else {
+            ctx.getString(R.string.level_pips, Gold.price(price), pips, Gold.money(Gold.pipsToPrice(pips)))
+        }
+    }
     trend.text = ctx.getString(R.string.trend_tf, s.trend, s.timeframe)
     reason.text = s.reason
 }

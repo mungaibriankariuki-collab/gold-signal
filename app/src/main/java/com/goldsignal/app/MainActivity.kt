@@ -189,15 +189,18 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val sl = settings.slPips
-        val tp = settings.tpPips
         val perPip = lot * Gold.USD_PER_PIP_PER_LOT
-        b.calcResult.text = getString(
-            R.string.calc_result,
-            Gold.money(perPip),
-            Gold.money(perPip * sl), sl,
-            Gold.money(perPip * tp), tp,
-            String.format(Locale.US, "1 : %.1f", tp.toDouble() / sl),
+        val lines = mutableListOf(
+            getString(R.string.calc_per_pip, Gold.money(perPip)),
+            getString(R.string.calc_risk, Gold.money(perPip * sl), sl),
         )
+        settings.tpPips.forEachIndexed { i, tp ->
+            lines += getString(
+                R.string.calc_reward, i + 1, Gold.money(perPip * tp), tp,
+                String.format(Locale.US, "1 : %.1f", tp.toDouble() / sl),
+            )
+        }
+        b.calcResult.text = lines.joinToString("\n")
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()

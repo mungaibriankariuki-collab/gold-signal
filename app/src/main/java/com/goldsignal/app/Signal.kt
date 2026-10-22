@@ -1,5 +1,6 @@
 package com.goldsignal.app
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class Signal(
@@ -8,9 +9,10 @@ data class Signal(
     val signal: String,
     val entry: Double?,
     val stopLoss: Double?,
-    val takeProfit: Double?,
+    /** TP1, TP2, TP3 prices (empty for NO TRADE). */
+    val takeProfits: List<Double>,
     val slPips: Int,
-    val tpPips: Int,
+    val tpPips: List<Int>,
     val trend: String,
     val timeframe: String,
     val reason: String,
@@ -27,9 +29,9 @@ data class Signal(
         .put("signal", signal)
         .put("entry", entry ?: JSONObject.NULL)
         .put("stopLoss", stopLoss ?: JSONObject.NULL)
-        .put("takeProfit", takeProfit ?: JSONObject.NULL)
+        .put("takeProfits", JSONArray(takeProfits))
         .put("slPips", slPips)
-        .put("tpPips", tpPips)
+        .put("tpPips", JSONArray(tpPips))
         .put("trend", trend)
         .put("timeframe", timeframe)
         .put("reason", reason)
@@ -46,9 +48,9 @@ data class Signal(
             signal = o.getString("signal"),
             entry = o.doubleOrNull("entry"),
             stopLoss = o.doubleOrNull("stopLoss"),
-            takeProfit = o.doubleOrNull("takeProfit"),
+            takeProfits = o.optJSONArray("takeProfits").toList { getDouble(it) },
             slPips = o.optInt("slPips", Settings.DEFAULT_SL),
-            tpPips = o.optInt("tpPips", Settings.DEFAULT_TP),
+            tpPips = o.optJSONArray("tpPips").toList { getInt(it) }.ifEmpty { Settings.DEFAULT_TPS },
             trend = o.optString("trend"),
             timeframe = o.optString("timeframe"),
             reason = o.optString("reason"),
@@ -63,3 +65,6 @@ fun JSONObject.doubleOrNull(key: String): Double? =
 
 fun JSONObject.stringOrNull(key: String): String? =
     if (isNull(key)) null else optString(key).ifEmpty { null }
+
+fun <T> JSONArray?.toList(get: JSONArray.(Int) -> T): List<T> =
+    if (this == null) emptyList() else (0 until length()).map { get(it) }

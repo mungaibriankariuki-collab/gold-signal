@@ -52,8 +52,16 @@
             </TableRow>
 
             <TableRow android:paddingVertical="3dp">
-                <TextView android:text="@string/label_tp" android:paddingEnd="16dp" android:textAppearance="?attr/textAppearanceBodyMedium" />
-                <TextView android:id="@+id/takeProfit" android:textIsSelectable="true" android:textColor="@color/buy" android:textAppearance="?attr/textAppearanceBodyLarge" />
+                <TextView android:text="@string/label_tp1" android:paddingEnd="16dp" android:textAppearance="?attr/textAppearanceBodyMedium" />
+                <TextView android:id="@+id/tp1" android:textIsSelectable="true" android:textColor="@color/buy" android:textAppearance="?attr/textAppearanceBodyLarge" />
+            </TableRow>
+            <TableRow android:paddingVertical="3dp">
+                <TextView android:text="@string/label_tp2" android:paddingEnd="16dp" android:textAppearance="?attr/textAppearanceBodyMedium" />
+                <TextView android:id="@+id/tp2" android:textIsSelectable="true" android:textColor="@color/buy" android:textAppearance="?attr/textAppearanceBodyLarge" />
+            </TableRow>
+            <TableRow android:paddingVertical="3dp">
+                <TextView android:text="@string/label_tp3" android:paddingEnd="16dp" android:textAppearance="?attr/textAppearanceBodyMedium" />
+                <TextView android:id="@+id/tp3" android:textIsSelectable="true" android:textColor="@color/buy" android:textAppearance="?attr/textAppearanceBodyLarge" />
             </TableRow>
 
             <TableRow android:paddingVertical="3dp">
