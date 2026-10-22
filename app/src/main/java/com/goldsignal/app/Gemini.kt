@@ -1,0 +1,164 @@
+package com.goldsignal.app
+
+import android.util.Base64
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.util.Locale
+
+class GeminiException(message: String) : IOException(message)
+
+/** Sends a chart screenshot to the Gemini API and turns the answer into a [Signal]. */
+object Gemini {
+    private const val BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
+
+    fun analyze(apiKey: String, model: String, jpeg: ByteArray, slPips: Int, tpPips: Int): Signal {
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray()
+                .put(JSONObject().put("text", prompt(slPips, tpPips)))
+                .put(JSONObject().put("inline_data", JSONObject()
+                    .put("mime_type", "image/jpeg")
+                    .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP)))))))
+            .put("generationConfig", JSONObject()
+                .put("temperature", 0.2)
+                .put("responseMimeType", "application/json")
+                .put("responseSchema", schema()))
+
+        val answer = JSONObject(post(apiKey, model, body.toString()))
+        val candidate = answer.optJSONArray("candidates")?.optJSONObject(0)
+            ?: throw GeminiException(
+                answer.optJSONObject("promptFeedback")?.stringOrNull("blockReason")
+                    ?.let { "Gemini refused the image ($it)." } ?: "Gemini returned no answer. Try again."
+            )
+        val parts = candidate.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
+        val text = (0 until parts.length())
+            .map { parts.getJSONObject(it) }
+            .filterNot { it.optBoolean("thought") }
+            .joinToString("") { it.optString("text") }
+            .trim().removePrefix("```json").removeSuffix("```").trim()
+        if (text.isEmpty()) {
+            throw GeminiException("Gemini returned an empty answer (${candidate.optString("finishReason")}). Try again.")
+        }
+        val r = try {
+            JSONObject(text)
+        } catch (e: Exception) {
+            throw GeminiException("Gemini's answer couldn't be read. Try again.")
+        }
+        return toSignal(r, slPips, tpPips)
+    }
+
+    private fun toSignal(r: JSONObject, slPips: Int, tpPips: Int): Signal {
+        val signal = when (r.optString("signal").uppercase(Locale.US).replace('_', ' ').trim()) {
+            Signal.BUY -> Signal.BUY
+            Signal.SELL -> Signal.SELL
+            else -> Signal.NO_TRADE
+        }
+        val entry = r.doubleOrNull("entry")?.takeIf { it > 0 }
+        // Stop and target are set from the pip settings so they are always exactly the chosen distance.
+        val sl = Gold.pipsToPrice(slPips)
+        val tp = Gold.pipsToPrice(tpPips)
+        val (stop, target) = when {
+            entry == null -> null to null
+            signal == Signal.BUY -> entry - sl to entry + tp
+            signal == Signal.SELL -> entry + sl to entry - tp
+            else -> null to null
+        }
+        return Signal(
+            time = System.currentTimeMillis(),
+            signal = signal,
+            entry = entry,
+            stopLoss = stop,
+            takeProfit = target,
+            slPips = slPips,
+            tpPips = tpPips,
+            trend = r.optString("trend").ifBlank { "Unclear" },
+            timeframe = r.optString("timeframe").ifBlank { "?" },
+            reason = r.optString("reason").trim(),
+            confidence = r.optString("confidence").ifBlank { "Low" },
+        )
+    }
+
+    private fun prompt(slPips: Int, tpPips: Int): String {
+        val sl = Gold.price(Gold.pipsToPrice(slPips))
+        val tp = Gold.price(Gold.pipsToPrice(tpPips))
+        return """
+            You are a careful trading analyst. The image is a MetaTrader 5 screenshot that should show a gold (XAUUSD) price chart.
+
+            Read the chart: the timeframe, the current price (the price label or line on the right-hand axis), the trend and market structure (higher highs and higher lows, or lower highs and lower lows), nearby support and resistance, and the last few candles.
+
+            Units: 1 pip = 0.10 of price (a move from 2400.00 to 2400.10 is 1 pip).
+            The trader uses a fixed stop loss of $slPips pips ($sl in price) and a fixed take profit of $tpPips pips ($tp in price).
+            For a BUY: stop = entry - $sl, target = entry + $tp. For a SELL: stop = entry + $sl, target = entry - $tp.
+
+            Decide BUY, SELL or NO TRADE. Choose NO TRADE when:
+            - the trend is unclear or price is in the middle of a range,
+            - a support or resistance level sits between the entry and a target $tp away,
+            - a stop $sl away would sit inside recent normal price swings,
+            - or the image is not a readable gold chart (say so in the reason).
+
+            entry: the price to enter at, normally the current price. Read it from the price axis and do not invent precision. Use null if no price can be read.
+            trend: Uptrend, Downtrend or Sideways.
+            timeframe: as shown on the chart, e.g. M5, M15, H1, H4, D1; "?" if not visible.
+            reason: 2 to 4 short sentences about what is visible on the chart that supports the decision.
+            confidence: High only when trend, level and recent candles all agree; Medium when most agree; Low otherwise.
+        """.trimIndent()
+    }
+
+    private fun schema(): JSONObject {
+        fun str(vararg values: String) = JSONObject().put("type", "STRING").apply {
+            if (values.isNotEmpty()) put("enum", JSONArray(values.toList()))
+        }
+        return JSONObject()
+            .put("type", "OBJECT")
+            .put("properties", JSONObject()
+                .put("signal", str(Signal.BUY, Signal.SELL, Signal.NO_TRADE))
+                .put("entry", JSONObject().put("type", "NUMBER").put("nullable", true))
+                .put("trend", str("Uptrend", "Downtrend", "Sideways"))
+                .put("timeframe", str())
+                .put("reason", str())
+                .put("confidence", str("Low", "Medium", "High")))
+            .put("required", JSONArray(listOf("signal", "entry", "trend", "timeframe", "reason", "confidence")))
+            .put("propertyOrdering", JSONArray(listOf("timeframe", "trend", "reason", "signal", "entry", "confidence")))
+    }
+
+    private fun post(apiKey: String, model: String, body: String): String {
+        val url = URL(BASE + URLEncoder.encode(model.trim(), "UTF-8") + ":generateContent")
+        val conn = url.openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.doOutput = true
+        conn.connectTimeout = 20_000
+        conn.readTimeout = 120_000
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        // Sent as a header so the key never appears in a URL.
+        conn.setRequestProperty("x-goog-api-key", apiKey)
+        try {
+            conn.outputStream.use { it.write(body.toByteArray()) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) throw GeminiException(errorMessage(code, text, model))
+            return text
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun errorMessage(code: Int, body: String, model: String): String {
+        val msg = try {
+            JSONObject(body).optJSONObject("error")?.optString("message").orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        return when {
+            msg.contains("API key", ignoreCase = true) || code == 401 || code == 403 ->
+                "Gemini rejected your API key. Check it in Settings."
+            code == 404 -> "Gemini model \"$model\" wasn't found. Change the model in Settings."
+            code == 429 -> "Gemini's free limit was reached. Wait a minute and try again."
+            code >= 500 -> "Gemini is busy or down (error $code). Try again shortly."
+            else -> "Gemini error $code: ${msg.ifEmpty { "unknown" }}"
+        }
+    }
+}

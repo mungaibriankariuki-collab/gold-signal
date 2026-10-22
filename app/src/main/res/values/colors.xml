@@ -1,0 +1,8 @@
+<resources>
+    <color name="brand">#B8860B</color>
+    <color name="launcher_bg">#B8860B</color>
+    <color name="buy">#2E7D32</color>
+    <color name="sell">#C62828</color>
+    <color name="no_trade">#616161</color>
+    <color name="medium">#EF8F00</color>
+</resources>

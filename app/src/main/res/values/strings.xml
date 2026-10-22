@@ -1,0 +1,57 @@
+<resources>
+    <string name="app_name">Gold Signal</string>
+    <string name="action_history">History</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_clear">Clear all</string>
+
+    <string name="no_image">Pick a screenshot, or share one from MT5 or your gallery</string>
+    <string name="pick">Pick screenshot</string>
+    <string name="analyze">Analyze</string>
+    <string name="analyzing">Sending to Gemini…</string>
+    <string name="need_image">Pick a screenshot first</string>
+    <string name="need_key">Add your Gemini API key in Settings first</string>
+    <string name="err_image">Couldn\'t open that image (%1$s)</string>
+    <string name="err_offline">No internet connection</string>
+    <string name="disclaimer">AI can misread charts. This is not financial advice: check the chart yourself and only risk what you can afford to lose.</string>
+
+    <string name="calc_title">Lot size calculator</string>
+    <string name="lot_hint">Lot size</string>
+    <string name="calc_result">%1$s per pip\nRisk: %2$s (SL %3$d pips)\nReward: %4$s (TP %5$d pips)\nRisk : reward = %6$s</string>
+    <string name="calc_invalid">Enter a lot size, e.g. 0.05</string>
+
+    <string name="label_entry">Entry</string>
+    <string name="label_sl">Stop loss</string>
+    <string name="label_tp">Take profit</string>
+    <string name="label_trend">Trend</string>
+    <string name="confidence">Confidence: %1$s</string>
+    <string name="level_pips">%1$s  (%2$d pips · %3$s)</string>
+    <string name="trend_tf">%1$s · %2$s</string>
+    <string name="no_level">—</string>
+
+    <string name="history_empty">No signals yet. Every analysis you run is saved here.</string>
+    <string name="clear_confirm">Delete all saved signals?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="desc_thumb">Chart screenshot</string>
+    <plurals name="signal_count">
+        <item quantity="one">%d signal</item>
+        <item quantity="other">%d signals</item>
+    </plurals>
+
+    <string name="key_title">Gemini API key</string>
+    <string name="key_hint">Paste your API key</string>
+    <string name="key_saved">A key is saved (encrypted). Leave this blank to keep it.</string>
+    <string name="key_none">No key saved yet.</string>
+    <string name="get_key">Get a free key at aistudio.google.com</string>
+    <string name="remove_key">Remove saved key</string>
+    <string name="key_removed">Key removed</string>
+    <string name="model_hint">Gemini model</string>
+    <string name="model_help">Default: gemini-flash-latest</string>
+    <string name="sltp_title">Stop loss and take profit</string>
+    <string name="sl_hint">Stop loss (pips)</string>
+    <string name="tp_hint">Take profit (pips)</string>
+    <string name="pips_help">%1$d pips = %2$s price move (1 pip = $0.10)</string>
+    <string name="save">Save</string>
+    <string name="saved">Saved</string>
+    <string name="err_pips">Enter whole numbers from 1 to 10000 for stop loss and take profit</string>
+</resources>
