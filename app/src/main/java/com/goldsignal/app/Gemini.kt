@@ -11,17 +11,20 @@ import java.util.Locale
 
 class GeminiException(message: String) : IOException(message)
 
-/** Sends a chart screenshot to the Gemini API and turns the answer into a [Signal]. */
+/** Sends chart screenshots (one or more timeframes) to the Gemini API and turns the answer into a [Signal]. */
 object Gemini {
     private const val BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 
-    fun analyze(apiKey: String, model: String, jpeg: ByteArray, slPips: Int, tpPips: List<Int>): Signal {
+    fun analyze(apiKey: String, model: String, jpegs: List<ByteArray>, slPips: Int, tpPips: List<Int>): Signal {
+        val parts = JSONArray().put(JSONObject().put("text", prompt(jpegs.size, slPips, tpPips)))
+        jpegs.forEachIndexed { i, jpeg ->
+            parts.put(JSONObject().put("text", "Screenshot ${i + 1}:"))
+            parts.put(JSONObject().put("inline_data", JSONObject()
+                .put("mime_type", "image/jpeg")
+                .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP))))
+        }
         val body = JSONObject()
-            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray()
-                .put(JSONObject().put("text", prompt(slPips, tpPips)))
-                .put(JSONObject().put("inline_data", JSONObject()
-                    .put("mime_type", "image/jpeg")
-                    .put("data", Base64.encodeToString(jpeg, Base64.NO_WRAP)))))))
+            .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
             .put("generationConfig", JSONObject()
                 .put("temperature", 0.2)
                 .put("responseMimeType", "application/json")
@@ -33,9 +36,9 @@ object Gemini {
                 answer.optJSONObject("promptFeedback")?.stringOrNull("blockReason")
                     ?.let { "Gemini refused the image ($it)." } ?: "Gemini returned no answer. Try again."
             )
-        val parts = candidate.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
-        val text = (0 until parts.length())
-            .map { parts.getJSONObject(it) }
+        val out = candidate.optJSONObject("content")?.optJSONArray("parts") ?: JSONArray()
+        val text = (0 until out.length())
+            .map { out.getJSONObject(it) }
             .filterNot { it.optBoolean("thought") }
             .joinToString("") { it.optString("text") }
             .trim().removePrefix("```json").removeSuffix("```").trim()
@@ -75,35 +78,56 @@ object Gemini {
             slPips = slPips,
             tpPips = tpPips,
             trend = r.optString("trend").ifBlank { "Unclear" },
-            timeframe = r.optString("timeframe").ifBlank { "?" },
+            timeframe = timeframes(r.optJSONArray("timeframes")),
             reason = r.optString("reason").trim(),
             confidence = r.optString("confidence").ifBlank { "Low" },
         )
     }
 
-    private fun prompt(slPips: Int, tpPips: List<Int>): String {
+    private val tfOrder = listOf("M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN")
+
+    /** "D1 Up · H4 Up · M15 Sideways", highest timeframe first. */
+    private fun timeframes(arr: JSONArray?): String = arr.toList { getJSONObject(it) }
+        .map { it.optString("timeframe").uppercase(Locale.US).trim() to it.optString("trend") }
+        .filter { it.first.isNotEmpty() }
+        .sortedByDescending { tfOrder.indexOf(it.first) }
+        .joinToString(" · ") { (tf, trend) ->
+            tf + " " + when (trend) {
+                "Uptrend" -> "Up"
+                "Downtrend" -> "Down"
+                else -> "Sideways"
+            }
+        }
+        .ifEmpty { "?" }
+
+    private fun prompt(count: Int, slPips: Int, tpPips: List<Int>): String {
         val sl = Gold.price(Gold.pipsToPrice(slPips))
         val tps = tpPips.map { Gold.price(Gold.pipsToPrice(it)) }
         val tp = tps.first()
         val tpList = tpPips.indices.joinToString(", ") { "TP${it + 1} = ${tpPips[it]} pips (${tps[it]})" }
         return """
-            You are a careful trading analyst. The image is a MetaTrader 5 screenshot that should show a gold (XAUUSD) price chart.
+            You are a careful trading analyst. You are given $count MetaTrader 5 screenshot(s) that should show gold (XAUUSD) price charts, usually the same moment on different timeframes (M1, M5, M15, M30, H1, H4, D1).
 
-            Read the chart: the timeframe, the current price (the price label or line on the right-hand axis), the trend and market structure (higher highs and higher lows, or lower highs and lower lows), nearby support and resistance, and the last few candles.
+            For each screenshot, read the timeframe from the chart label and the trend and market structure (higher highs and higher lows, or lower highs and lower lows). Then do a top-down analysis:
+            - D1 and H4 set the direction. Only trade in that direction.
+            - H1 and M30 give the key support and resistance zones.
+            - M15, M5 and M1 time the entry: price at or reacting from a zone, with the lower timeframe turning in the trade direction.
+            Read the current price (the price label or line on the right-hand axis) from the lowest-timeframe screenshot.
 
             Units: 1 pip = 0.10 of price (a move from 2400.00 to 2400.10 is 1 pip).
             The trader uses a fixed stop loss of $slPips pips ($sl in price) and three take profits: $tpList.
             For a BUY: stop = entry - $sl, each target = entry + its distance. For a SELL: stop = entry + $sl, each target = entry - its distance.
 
             Decide BUY, SELL or NO TRADE. Choose NO TRADE when:
-            - the trend is unclear or price is in the middle of a range,
+            - the trend is unclear, the higher timeframes disagree, or price is in the middle of a range,
+            - the lower timeframes have not confirmed an entry yet,
             - a support or resistance level sits between the entry and TP1 ($tp away),
             - a stop $sl away would sit inside recent normal price swings,
-            - or the image is not a readable gold chart (say so in the reason).
+            - or no screenshot is a readable gold chart (say so in the reason).
 
             entry: the price to enter at, normally the current price. Read it from the price axis and do not invent precision. Use null if no price can be read.
-            trend: Uptrend, Downtrend or Sideways.
-            timeframe: as shown on the chart, e.g. M5, M15, H1, H4, D1; "?" if not visible.
+            trend: the overall direction from the higher timeframes: Uptrend, Downtrend or Sideways.
+            timeframes: one entry per screenshot with its timeframe (M1, M5, M15, M30, H1, H4, D1, or "?" if not visible) and its own trend.
             reason: 2 to 4 short sentences about what is visible on the chart that supports the decision, including which take profits look reachable.
             confidence: High only when trend, level and recent candles all agree; Medium when most agree; Low otherwise.
         """.trimIndent()
@@ -119,11 +143,18 @@ object Gemini {
                 .put("signal", str(Signal.BUY, Signal.SELL, Signal.NO_TRADE))
                 .put("entry", JSONObject().put("type", "NUMBER").put("nullable", true))
                 .put("trend", str("Uptrend", "Downtrend", "Sideways"))
-                .put("timeframe", str())
+                .put("timeframes", JSONObject()
+                    .put("type", "ARRAY")
+                    .put("items", JSONObject()
+                        .put("type", "OBJECT")
+                        .put("properties", JSONObject()
+                            .put("timeframe", str())
+                            .put("trend", str("Uptrend", "Downtrend", "Sideways")))
+                        .put("required", JSONArray(listOf("timeframe", "trend")))))
                 .put("reason", str())
                 .put("confidence", str("Low", "Medium", "High")))
-            .put("required", JSONArray(listOf("signal", "entry", "trend", "timeframe", "reason", "confidence")))
-            .put("propertyOrdering", JSONArray(listOf("timeframe", "trend", "reason", "signal", "entry", "confidence")))
+            .put("required", JSONArray(listOf("signal", "entry", "trend", "timeframes", "reason", "confidence")))
+            .put("propertyOrdering", JSONArray(listOf("timeframes", "trend", "reason", "signal", "entry", "confidence")))
     }
 
     private fun post(apiKey: String, model: String, body: String): String {

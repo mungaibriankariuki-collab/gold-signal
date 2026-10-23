@@ -3,6 +3,9 @@ package com.goldsignal.app
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -23,9 +26,30 @@ object Images {
         return compress(bmp, maxSide, 85)
     }
 
-    fun thumbnail(jpeg: ByteArray, maxSide: Int = 480): ByteArray {
-        val bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: throw IOException("not an image")
-        return compress(bmp, maxSide, 75)
+    /** Decodes a JPEG at roughly [maxSide] pixels to keep memory low. */
+    fun decodeSmall(jpeg: ByteArray, maxSide: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, bounds)
+        var sample = 1
+        while (max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+        return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    /** One thumbnail with all the screenshots side by side. */
+    fun strip(jpegs: List<ByteArray>, height: Int = 240): ByteArray {
+        val bmps = jpegs.mapNotNull { decodeSmall(it, height * 2) }
+        if (bmps.isEmpty()) throw IOException("not an image")
+        val widths = bmps.map { (it.width * height.toFloat() / it.height).roundToInt().coerceAtLeast(1) }
+        val gap = 6
+        val out = Bitmap.createBitmap(widths.sum() + gap * (bmps.size - 1), height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.drawColor(Color.WHITE)
+        var x = 0
+        bmps.forEachIndexed { i, bmp ->
+            canvas.drawBitmap(bmp, null, Rect(x, 0, x + widths[i], height), null)
+            x += widths[i] + gap
+        }
+        return compress(out, 2400, 75)
     }
 
     private fun open(ctx: Context, uri: Uri) =

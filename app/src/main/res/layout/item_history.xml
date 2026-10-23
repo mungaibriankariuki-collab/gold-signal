@@ -12,14 +12,6 @@
         android:orientation="horizontal"
         android:paddingBottom="6dp">
 
-        <ImageView
-            android:id="@+id/thumb"
-            android:layout_width="72dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="12dp"
-            android:contentDescription="@string/desc_thumb"
-            android:scaleType="centerCrop" />
-
         <TextView
             android:id="@+id/time"
             android:layout_width="0dp"
@@ -35,6 +27,16 @@
             android:contentDescription="@string/delete"
             android:src="@drawable/ic_close" />
     </LinearLayout>
+
+    <ImageView
+        android:id="@+id/thumb"
+        android:layout_width="wrap_content"
+        android:layout_height="80dp"
+        android:layout_marginBottom="6dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/desc_thumb"
+        android:maxWidth="400dp"
+        android:scaleType="fitStart" />
 
     <include
         android:id="@+id/signal"

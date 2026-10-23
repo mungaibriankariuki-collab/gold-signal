@@ -11,8 +11,8 @@ android {
         applicationId = "com.goldsignal.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     val keystorePassword = System.getenv("KEYSTORE_PASSWORD")

@@ -3,7 +3,8 @@
 Android app that reads an MT5 gold (XAUUSD) chart screenshot with the Gemini API and returns
 BUY / SELL / NO TRADE with entry, stop loss, TP1, TP2, TP3, trend, reason and confidence.
 
-- Pick a screenshot from the gallery, or share one to the app from MT5 or the gallery.
+- Add up to 7 screenshots (M1, M5, M15, M30, H1, H4, D1) from the gallery or by sharing from MT5;
+  Gemini reads them together for a top-down analysis.
 - Your Gemini API key is entered in Settings and stored encrypted with an Android Keystore key.
 - Stop loss and three take profits are set in pips (defaults SL 120, TP1 240, TP2 370, TP3 500;
   1 pip = $0.10 price move). The app places them at exactly those distances from Gemini's entry.

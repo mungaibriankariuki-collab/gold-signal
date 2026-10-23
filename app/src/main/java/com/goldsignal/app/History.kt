@@ -24,11 +24,11 @@ object History {
     }
 
     @Synchronized
-    fun add(ctx: Context, s: Signal, jpeg: ByteArray): Signal {
+    fun add(ctx: Context, s: Signal, jpegs: List<ByteArray>): Signal {
         val name = "${s.time}.jpg"
         val saved = try {
             thumbs(ctx).mkdirs()
-            File(thumbs(ctx), name).writeBytes(Images.thumbnail(jpeg))
+            File(thumbs(ctx), name).writeBytes(Images.strip(jpegs))
             s.copy(image = name)
         } catch (e: Exception) {
             s
